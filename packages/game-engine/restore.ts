@@ -1,4 +1,4 @@
-import { type GameState } from "./index";
+import { cloneGame, type GameState } from "./index";
 import { validateRules } from "../rulesets";
 export function restoreGame(value: unknown): GameState {
   const state = value as GameState;
@@ -69,5 +69,5 @@ export function restoreGame(value: unknown): GameState {
     })
   )
     throw new Error("INVALID_SAVED_GAME");
-  return structuredClone(state);
+  return cloneGame(state);
 }

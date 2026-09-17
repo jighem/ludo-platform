@@ -1,0 +1,44 @@
+name: Platform checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: disposable-ci-password
+          MYSQL_DATABASE: ludo_test_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pdisposable-ci-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      PLATFORM_DATABASE_URL: mysql://root:disposable-ci-password@127.0.0.1:3306/ludo_test_ci
+      TEST_DATABASE_URL: mysql://root:disposable-ci-password@127.0.0.1:3306/ludo_test_ci
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm exec --workspace=player -- tsc --noEmit
+      - run: npm run db:migrate
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:player

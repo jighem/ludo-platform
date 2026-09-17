@@ -12,7 +12,9 @@
     "test": "tsx --test tests/**/*.test.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "dev:platform": "tsx apps/api/start.ts",
-    "email:deliver": "tsx scripts/deliver-email.ts"
+    "email:deliver": "tsx scripts/deliver-email.ts",
+    "dev:player": "npm run start --workspace=player",
+    "build:player": "npm exec --workspace=player -- expo export --platform web"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -30,8 +32,8 @@
     "motion": "^12.23.24",
     "mysql2": "^3.23.3",
     "nodemailer": "^10.0.10",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "recharts": "^3.10.1",
     "sql.js": "^1.14.1",
     "tailwind-merge": "^3.6.0",
@@ -52,5 +54,11 @@
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
   },
-  "packageManager": "npm@11.6.2"
+  "packageManager": "npm@11.6.2",
+  "workspaces": [
+    "apps/player"
+  ],
+  "overrides": {
+    "uuid": "11.1.1"
+  }
 }

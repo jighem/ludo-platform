@@ -124,8 +124,20 @@ export function candidates(state: GameState): DiceAudit {
       ),
   });
 }
+export function cloneGame(state: GameState): GameState {
+  return {
+    ...state,
+    rules: validateRules(state.rules),
+    players: state.players.map((player) => ({
+      ...player,
+      tokens: [...player.tokens],
+    })),
+    finishOrder: [...state.finishOrder],
+    eliminated: [...state.eliminated],
+  };
+}
 function fresh(state: GameState): Transition {
-  return { state: structuredClone(state), events: [] };
+  return { state: cloneGame(state), events: [] };
 }
 function validateActor(state: GameState, actor: string, now: number) {
   requireValue(state.phase === "PLAYING", "MATCH_COMPLETED");

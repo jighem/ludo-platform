@@ -22,5 +22,9 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "apps/player",
+    "node_modules"
+  ]
 }

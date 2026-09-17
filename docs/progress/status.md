@@ -1,24 +1,47 @@
 # Build progress
 
-Working directory: D:/Projects/Others/Ludo. Remote: jighem/ludo-platform.
+Workspace: D:/Projects/Others/Ludo. Repository: https://github.com/jighem/ludo-platform.
 
-| Phase | Status | Evidence |
-|---|---|---|
-| 1 | Complete | docs/phase-1 |
-| 2 | Foundation implemented; domain schema grows with each phase | MySQL migrations, ledger/checksums/locking; real MySQL install/replay/FK/rollback tests |
-| 3 | Backend implemented; account screens and external email delivery pending | Registration, verification, recovery, revocable sessions, origin checks, persistent rate limits, SMTP outbox adapter; 7 automated tests pass |
-| 4-20 | Pending | Follow docs/phase-1/build-plan.md |
+This is an incremental rebuild, not a completed production release. Legacy features remain in the original app while their replacements are introduced separately.
 
-Use npm and package-lock.json (`npm ci`). bun.lock is historical reference, not the active lockfile. Existing application code remains available while the separate platform API is built. No production database has been modified.
+| Phase | Current evidence and remaining work |
+|---|---|
+| 1. Assessment | Repository inspection, architecture and migration plan documented in phase-1. |
+| 2. Database | Three tracked MySQL migrations; checksum/history guards; real database replay, foreign key and rollback tests. Legacy data import and restore rehearsal remain. |
+| 3. Accounts | Verified accounts, password recovery, revocable sessions, origin checks, persistent limits and SMTP outbox backend. Account screens and real SMTP delivery remain. |
+| 4–6. Rules and gameplay | Shared versioned pure engine, standard/custom audited dice, timeout and surrender; tests for 2–4 players, collisions, captures and six rules. History is append-only through the API; production database role hardening remains. |
+| 7–8. Board and pass-and-play | Expo player app, original SVG board, local durable game/history, secure random sampling, restore validation, background return handling. Web export and phone/desktop visual checks pass. Actual Android/iOS lifecycle testing remains. |
+| 9. Leagues | Scoped creation, invitations, join requests, roles, last-admin protection and audit backend; concurrent invitation/admin tests. League screens and bulk operations remain. |
+| 10–11. Scoring and manual results | Pinned scoring versions, manual pending/approve/reject/correct/cancel/dispute revisions, scoped standings and history. Online completion produces server-derived approved results. UI workflows remain. |
+| 12. Protected offline | Pending. Local pass-and-play is not protected offline and does not claim tamper resistance. |
+| 13–14. Online foundations | Authenticated REST intents, cryptographic server dice, transactional idempotency, revision guards, event recovery, check-in and persisted deadline scanner. WebSocket delivery, presence/reconnect grace and online player screens remain. |
+| 15–18. Tournaments, global ranking, portals | Pending. League points are not global ratings. |
+| 19–20. Hardening and release | GitHub checks configured. Native builds/devices, capacity tests, deployment, monitoring and recovery rehearsals remain. |
 
-## Local database
+## Run locally
 
-MySQL 8.4.11 runs on 127.0.0.1:33316. New databases: ludo_platform and ludo_test_foundation. The dedicated local account is scoped to those databases. Credentials are in ignored .env; administrative credentials and local database files are under ignored .local. Never publish either directory/file. The local instance is not installed as a Windows service.
+Use Node 24 and npm: `npm ci`, `npm run db:migrate`, `npm test`, `npm run lint`.
 
-Run `npm run db:migrate`, `npm test`, `npm run lint`, and `npm run build`. Run `npm run dev:platform` for the new API on localhost:3001. Existing `npm run dev` still runs the legacy application and is not the new production API. Schema migration intentionally refuses an unbaselined legacy database. Historical import remains a separate reviewed step.
+- API: `npm run dev:platform` (localhost:3001).
+- Player: `npm run dev:player`, then choose web or a connected Expo-compatible device.
+- Web export: `npm run build:player` (apps/player/dist).
+- Player typecheck: `npm exec --workspace=player -- tsc --noEmit`.
+- `npm run dev` and `npm run build` still target the retained legacy application.
 
-## Email and sessions
+Local MySQL 8.4.11 listens only on 127.0.0.1:33316. Databases are ludo_platform and ludo_test_foundation. Credentials remain in ignored .env; local database files and administrator credentials remain in ignored .local. This instance is not a Windows service. Restart it after reboot before running database checks.
 
-Email tokens are cryptographically random, hashed in account_tokens, and expire. Transactional email jobs retain the raw link token only until delivered; the worker redacts the payload after success. Configure SMTP_URL, MAIL_FROM and APP_URL, then run `npm run email:deliver` (one job per invocation). SMTP delivery is at-least-once; a crash after sending can duplicate an email. Actual provider delivery has not been tested without SMTP configuration.
+The API and player are separate development targets; the current player screen is local pass-and-play. Account/league/online API routes are not yet connected to player navigation. Rules must be published by a platform administrator through the rules repository before creating API matches; an operator bootstrap flow remains to be delivered.
 
-Browser login uses a HttpOnly SameSite=Strict cookie, Secure when APP_URL is HTTPS. Native clients can explicitly request a bearer session token. Sessions are checked against the database on every request and are revoked by logout/password reset. Passwords use salted scrypt. Deployment must use HTTPS and a worker scheduler, and add database rate-limit retention cleanup. These backend components do not yet constitute the completed product.
+## Verification
+
+30 tests pass against the real local MySQL instance. They cover auth, migrations, engine/dice, cross-league denial, concurrent single-use invitations, last-admin changes, duplicate roll receipts, stale commands, competing deadline workers, manual approval/correction/cancellation and historical scoring. Root/player TypeScript checks and web builds are also run. GitHub workflow results must be checked separately; configuration alone is not a successful CI run.
+
+The board was checked at phone, tablet and desktop viewports from 360x640 through 1920x1080. The updated 360x640 view keeps the board, timer, dice and four move controls visible. Browser checks do not replace native device tests. App launcher artwork is still the Expo template; the in-game board is original code-rendered artwork.
+
+## Remaining operational work
+
+Configure SMTP_URL, MAIL_FROM and APP_URL for real account mail. `npm run email:deliver` sends one queued job; provider delivery has not been tested. Browser sessions need HTTPS in production. Persisted match-update outbox records are prepared for realtime delivery but do not yet have a broadcasting worker.
+
+Result, scoring and rules histories have no mutation API. Database-level append-only permissions/triggers require a separate migration/owner role in production. An attempted trigger migration was rejected before applying any DDL by the limited local account; zero triggers were verified and only its failed migration marker was removed. No application privileges were expanded.
+
+Dependencies include an unresolved moderate advisory through Expo's xcode/uuid build-tool chain. Review and verify a compatible fix before native release; do not claim a clean dependency audit. Backups, restore tests, least-privilege production roles, retention cleanup, observability and release rollback are still release gates.

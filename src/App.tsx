@@ -103,7 +103,7 @@ function MainApp() {
         return (
           <PlayersPage
             onSelectPlayer={handleSelectPlayer}
-            onOpenAddPlayer={() => setIsAddPlayerOpen(true)}
+
           />
         );
       case 'player-profile':
