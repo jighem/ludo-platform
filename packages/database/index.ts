@@ -23,6 +23,9 @@ export async function transaction<T>(
 ): Promise<T> {
   const connection = await db.getConnection();
   try {
+    // Each statement sees committed rows after waiting on an aggregate lock.
+    // Critical decisions still use explicit row locks.
+    await connection.query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
     await connection.beginTransaction();
     const result = await work(connection);
     await connection.commit();

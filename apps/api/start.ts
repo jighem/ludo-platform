@@ -1,3 +1,4 @@
+import { expireDueMatches } from "../../packages/match-engine/timers";
 import "dotenv/config";
 import { createDatabase } from "../../packages/database";
 import { createApp } from "./app";
@@ -11,9 +12,26 @@ const server = createApp(
 ).listen(Number(process.env.PLATFORM_PORT || 3001), "127.0.0.1", () =>
   console.log("Platform API listening on localhost"),
 );
+let ticking = false;
+const timer = setInterval(async () => {
+  if (ticking) return;
+  ticking = true;
+  try {
+    await expireDueMatches(db);
+  } catch {
+    console.error("Match deadline scan failed");
+  } finally {
+    ticking = false;
+  }
+}, 1000);
+timer.unref();
 for (const signal of ["SIGINT", "SIGTERM"] as const)
-  process.on(signal, () =>
-    server.close(() => {
-      void db.end().then(() => process.exit(0));
-    }),
+  process.on(
+    signal,
+    () => (
+      clearInterval(timer),
+      server.close(() => {
+        void db.end().then(() => process.exit(0));
+      })
+    ),
   );

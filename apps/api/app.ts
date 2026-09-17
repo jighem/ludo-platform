@@ -1,3 +1,6 @@
+import { ResultService } from "../../packages/results";
+import { MatchService } from "../../packages/match-engine";
+import { LeagueService } from "../../packages/league-engine";
 import express, {
   type Request,
   type Response,
@@ -157,6 +160,228 @@ export function createApp(db: Database, appUrl: string) {
       res.json({ ok: true });
     }),
   );
+  const leagues = new LeagueService(db);
+  app.get(
+    "/api/v2/leagues",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res.json({ leagues: await leagues.list(req.identity!.id) }),
+    ),
+  );
+  app.post(
+    "/api/v2/leagues",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res
+        .status(201)
+        .json(
+          await leagues.create(
+            req.identity!.id,
+            req.body?.name,
+            req.body?.visibility,
+          ),
+        ),
+    ),
+  );
+  app.post(
+    "/api/v2/invitations/accept",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res.json(await leagues.accept(req.identity!.id, req.body?.code)),
+    ),
+  );
+  app.get(
+    "/api/v2/leagues/:leagueId/members",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res.json({
+        members: await leagues.members(req.identity!.id, req.params.leagueId),
+      }),
+    ),
+  );
+  app.post(
+    "/api/v2/leagues/:leagueId/invitations",
+    authenticated,
+    asyncRoute(async (req, res) => {
+      const invitee = req.body?.userId;
+      if (
+        invitee !== undefined &&
+        (typeof invitee !== "string" || invitee.length !== 36)
+      )
+        throw new DomainError("INVALID_INVITEE");
+      res
+        .status(201)
+        .json(
+          await leagues.invite(
+            req.identity!.id,
+            req.params.leagueId,
+            invitee ?? null,
+          ),
+        );
+    }),
+  );
+  app.post(
+    "/api/v2/leagues/:leagueId/join-requests",
+    authenticated,
+    asyncRoute(async (req, res) => {
+      await leagues.requestJoin(req.identity!.id, req.params.leagueId);
+      res.status(201).json({ ok: true });
+    }),
+  );
+  app.post(
+    "/api/v2/leagues/:leagueId/join-requests/:userId/decision",
+    authenticated,
+    asyncRoute(async (req, res) => {
+      await leagues.decideJoin(
+        req.identity!.id,
+        req.params.leagueId,
+        req.params.userId,
+        req.body?.approved,
+      );
+      res.json({ ok: true });
+    }),
+  );
+  app.patch(
+    "/api/v2/leagues/:leagueId/members/:userId",
+    authenticated,
+    asyncRoute(async (req, res) => {
+      await leagues.setMember(
+        req.identity!.id,
+        req.params.leagueId,
+        req.params.userId,
+        req.body?.role,
+        req.body?.status,
+      );
+      res.json({ ok: true });
+    }),
+  );
+  app.post(
+    "/api/v2/leagues/:leagueId/scoring",
+    authenticated,
+    asyncRoute(async (req, res) => {
+      await leagues.configureScoring(
+        req.identity!.id,
+        req.params.leagueId,
+        req.body,
+      );
+      res.status(201).json({ ok: true });
+    }),
+  );
+  const matches = new MatchService(db);
+  app.post(
+    "/api/v2/matches",
+    authenticated,
+    asyncRoute(async (req, res) => {
+      if (
+        req.body?.leagueId !== undefined &&
+        typeof req.body.leagueId !== "string"
+      )
+        throw new DomainError("INVALID_LEAGUE");
+      res
+        .status(201)
+        .json(
+          await matches.create(
+            req.identity!.id,
+            req.body?.players,
+            req.body?.rulesetVersionId,
+            req.body?.leagueId,
+          ),
+        );
+    }),
+  );
+  app.get(
+    "/api/v2/matches/:matchId",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res.json(
+        await matches.snapshot(
+          req.identity!.id,
+          req.params.matchId,
+          Number(req.query.after ?? 0),
+        ),
+      ),
+    ),
+  );
+  app.post(
+    "/api/v2/matches/:matchId/check-in",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res.json(await matches.checkIn(req.identity!.id, req.params.matchId)),
+    ),
+  );
+  app.post(
+    "/api/v2/matches/:matchId/commands",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res.json(
+        await matches.command(req.identity!.id, req.params.matchId, req.body),
+      ),
+    ),
+  );
+  const results = new ResultService(db);
+  app.get(
+    "/api/v2/leagues/:leagueId/standings",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res.json({
+        standings: await results.standings(
+          req.identity!.id,
+          req.params.leagueId,
+        ),
+      }),
+    ),
+  );
+  app.post(
+    "/api/v2/leagues/:leagueId/manual-results",
+    authenticated,
+    asyncRoute(async (req, res) => {
+      if (typeof req.body?.rulesetVersionId !== "string")
+        throw new DomainError("INVALID_RULESET");
+      res
+        .status(201)
+        .json(
+          await results.manual(
+            req.identity!.id,
+            req.params.leagueId,
+            req.body.rulesetVersionId,
+            req.body?.placements,
+            req.body?.reason,
+          ),
+        );
+    }),
+  );
+  app.get(
+    "/api/v2/leagues/:leagueId/results/:matchId/history",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res.json({
+        history: await results.history(
+          req.identity!.id,
+          req.params.leagueId,
+          req.params.matchId,
+        ),
+      }),
+    ),
+  );
+  app.post(
+    "/api/v2/leagues/:leagueId/results/:matchId/revisions",
+    authenticated,
+    asyncRoute(async (req, res) =>
+      res
+        .status(201)
+        .json(
+          await results.revise(
+            req.identity!.id,
+            req.params.leagueId,
+            req.params.matchId,
+            req.body?.expectedRevision,
+            req.body?.approval,
+            req.body?.reason,
+            req.body?.placements,
+          ),
+        ),
+    ),
+  );
   app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
     const status =
       error instanceof DomainError
@@ -166,16 +391,14 @@ export function createApp(db: Database, appUrl: string) {
           : error instanceof SyntaxError
             ? 400
             : 500;
-    res
-      .status(status)
-      .json({
-        error:
-          error instanceof DomainError
-            ? error.code
-            : status === 500
-              ? "INTERNAL_ERROR"
-              : "INVALID_REQUEST",
-      });
+    res.status(status).json({
+      error:
+        error instanceof DomainError
+          ? error.code
+          : status === 500
+            ? "INTERNAL_ERROR"
+            : "INVALID_REQUEST",
+    });
   });
   return app;
 }
